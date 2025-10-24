@@ -1,0 +1,98 @@
+Creamos el grupo de seguridad
+con 3 Entrada SSH (mi IP) HTTP (IP v4) HTTP (IP v4)
+con 1 de salida para todo
+
+Creamos la instancia 
+	genero mi clave
+	Ubuntu 24.04
+	t3.micro
+
+cambiamos la ubicación de la clave a una Unidad de rápido acceso
+
+chmod 400 <nombreClave>
+
+conectamos con ssh -i "miclave.pem" XYYY
+
+conectamos al ubuntu
+
+actualizamos ubuntu sudo apt update
+
+Nos convertimos en un super usuario en Ubuntu (root)
+
+sudo su
+
+
+Instalamos APACHE 2
+
+sudo apt install apache2
+cd /var/www/html
+
+
+instalamos MYSQL 
+	sudo apt install mysql-server 
+
+logueo de MYSQL SERVER
+
+	sudo mysql -u root
+
+CAmbiar de clave al usuario root
+ 
+
+
+
+ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password by 'mipassword@123';
+
+crear un usuario para wordpress en mysql
+
+CREATE USER 'wp_user'@localhost IDENTIFIED BY 'mipassword@123';
+
+(opcional) Para volver a ingresar como usuario root
+			sudo mysql -u root -p
+			password:
+
+Comprobar si se creo el usuario
+	SELECT User from mysql.user;
+
+Creamos una base de datos
+	CREATE DATABASE db_wp;
+
+
+Damos privilegios a nuestro usuario wp_user
+	GRANT ALL PRIVILEGES ON db_wp.* TO 'wp_user'@localhost;
+
+Salir de MYQSL escribiendo exit
+
+Ingresamos a la carpeta cd /var/www/html
+
+descargar wordpress desde la pagina wordpress.org
+
+	sudo wget https://wordpress.org/wordpress-6.8.3.tar.gz
+
+Decomprimimos el archivo de worpress
+   
+sudo tar -xzvf wordpress-6.8.3.tar.gz
+
+
+
+Instalamos PHP necesario para configurar wordpress
+
+sudo apt install php libapache2-mod-php php-mysql php-curl php-mbstring php-gd php-xml php-xmlrpc php-soap php-intl php-zip
+
+Editar el archicvo info.php 
+sudo nano /var/www/html/info.php
+
+
+copiamos lo siguiente:
+<?php
+  phpinfo();
+?>
+
+Damos permisos a wordpress
+
+sudo chown -R www-data:www-data /var/www/html/wordpress
+
+sudo chmod -R 755 /var/www/html/wordpress/
+
+Ingresamos a wordpres
+
+miIPPublico/wordpress/wp-admin/setup-config.php
