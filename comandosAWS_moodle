@@ -1,0 +1,96 @@
+Creamos el grupo de seguridad
+con 3 Entrada SSH (mi IP) HTTP (IP v4) HTTP (IP v4)
+con 1 de salida para todo
+
+Creamos la instancia 
+	genero mi clave
+	Ubuntu 24.04
+	t3.micro
+
+cambiamos la ubicación de la clave a una Unidad de rápido acceso
+
+chmod 400 <nombreClave>
+
+conectamos con ssh -i "miclave.pem" XYYY
+
+conectamos al ubuntu
+actualizamos ubuntu 
+	sudo apt update && sudo apt upgrade
+
+Nos convertimos en un super usuario en Ubuntu (root)
+
+sudo su
+
+
+Instalamos APACHE 2
+  sudo apt install apache2
+
+
+instalamos MARIADB 
+	sudo apt install mariadb-server 
+
+Logeo de MARIADB SERVER
+
+	sudo mysql -u root
+
+
+crear un usuario para moodle en mysql
+
+  CREATE USER 'moodle_user'@localhost IDENTIFIED BY 'mipassword@123';
+
+Comprobar si se creo el usuario
+	SELECT User from mysql.user;
+
+Creamos una base de datos
+	CREATE DATABASE db_moodle;
+
+Comprobar si se creo la base de datos
+
+	show databases;
+
+
+Damos privilegios a nuestro usuario wp_user
+	GRANT ALL PRIVILEGES ON db_moodle.* TO 'moodle_user'@localhost;
+
+
+
+Instalamos PHP necesario para configurar moodle
+
+sudo apt install php libapache2-mod-php php-mysql php-curl php-mbstring php-gd php-xml php-xmlrpc php-soap php-intl php-bcmath php-ldap php-zip
+
+verificar la version de php
+	php -v
+
+Verificar max_input_vars=5000
+	sudo nano /etc/php/8.3/apache2/php.ini
+quitamoa ; y actualiamos el valor a 5000
+
+
+cd /var/www/html
+sudo wget https://download.moodle.org/download.php/direct/stable405/moodle-latest-405.tgz
+sudo tar -zxvf moodle-latest-405.tgz
+sudo mv moodle /var/www/html/moodle
+sudo mkdir /var/moodledata
+sudo chown -R www-data:www-data /var/www/html/moodle /var/moodledata
+sudo chmod -R 755 /var/www/html/moodle /var/moodledata
+
+
+
+Abre tu navegador y entra a:
+http://<tu_IP_pública>/moodle
+
+Sigue el asistente de instalación:
+
+Ruta de datos: /var/moodledata
+
+Base de datos: db_moodle
+
+Usuario: moodle_user
+
+Contraseña: la creada en MySQL.
+
+Espera que Moodle configure la base y cree las tablas.
+
+
+Usuario de acceso a moodle: lvives
+Contraseña de acceso a moodle: Mipassword@123
