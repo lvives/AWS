@@ -1,0 +1,145 @@
+Step 1: Crear grupos de seguridad
+
+Security Group (SG):
+		Crea uno nuevo: sg-wordpress.
+		Permitir:
+			SSH: port 22, Source: tu IP (My IP).
+			HTTP: port 80, Source: IPv4 -> 0.0.0.0/0
+			HTTPS: port 443, Source: IPv4 -> 0.0.0.0/0
+			
+Security Group (SG):
+		Crea uno nuevo: sg-mysql.
+		Permitir:
+			SSH: port 22, Source: tu IP (My IP).
+			MySQL/Aurora: port 3306, Source: sg-wordpress
+
+Security Group (SG):
+		Crea uno nuevo: sg-loadbalancer.
+		Permitir:
+			HTTP: port 80, Source: IPv4 -> 0.0.0.0/0
+
+Step 2: Crear la instancia de base de datos (MySQL en EC2)
+	Ve a EC2 → Instances → Launch instances.
+	Nombre: db-mysql.
+	AMI: Ubuntu Server 22.04 LTS.
+	Tipo: t3.micro (o el que tengas disponible en AWS Academy / Free Tier).
+	Par de claves: usa tu key (.pem).
+	Security Group (SG): sg-mysql.
+	------
+	Conectarte por SSH
+		chmod 400 <tukey (.pem).>
+		ssh -i <tukey.pem> ubuntu@IP_PUBLICA_DB
+	Instalar MySQL Server
+		sudo apt update
+		sudo apt install -y mysql-server
+	Configurar MySQL para aceptar conexiones remotas
+		sudo nano /etc/mysql/mysql.conf.d/mysqld.cnf
+		Busca la línea: bind-address = 127.0.0.1
+		Cámbiala por: bind-address = 0.0.0.0
+	Reinicia MySQL:
+		sudo systemctl restart mysql
+		sudo systemctl status mysql
+	Crear la BD y el usuario para WordPress
+		sudo mysql -u root -p
+		CREATE DATABASE wp_db;
+		CREATE USER 'wp_user'@'%' IDENTIFIED BY 'mipassword@123';
+		GRANT ALL PRIVILEGES ON wp_db.* TO 'wp_user'@'%';
+		FLUSH PRIVILEGES;
+		EXIT;
+Step 3. Crear las dos instancias con WordPress
+	Repetiremos el proceso para dos instancias: wp1 y wp2
+	C2 → Launch instances.
+		Nombre: wp1 y wp2.
+		AMI: Ubuntu Server 22.04.
+		Tipo: t3.micro (o similar).
+		Par de claves: el mismo .pem.
+		Security group: sg-wordpress.
+	<Repite lo mismo luego para wp2>
+
+	3.1. Instalar Apache, PHP y dependencias en cada wp1 y wp2
+		ssh -i /ruta/a/tu/llave.pem ubuntu@IP_PUBLICA_WP1
+		Instala Apache, PHP, módulos y herramientas en cada wp1 y wp2:
+			sudo apt update
+			sudo apt install -y apache2 php libapache2-mod-php php-mysql php-xml php-gd php-curl php-mbstring php-zip php-xmlrpc unzip
+	3.2. Descargar WordPress en cada web server en cada wp1 y wp2
+		Eliminar index.html de caperta html
+			cd /var/www/html
+			sudo rm index.html
+		Descargar wordpress en carpeta temporal
+			cd /tmp
+			sudo wget https://wordpress.org/wordpress-6.8.3.tar.gz
+		Decomprimimos el archivo de worpress
+   		sudo tar -xzvf wordpress-6.8.3.tar.gz
+   	copiar carpeta descomprimida a /var/www/html
+   		sudo cp -r wordpress/* /var/www/html/
+   	ir a la carpeta /var/www/html y comprobar la existencia de los archivos
+   	Darle permiso de lectura y escritura a las carpetas y archivos
+   		sudo chown -R www-data:www-data /var/www/html/
+   		sudo chmod -R 755 /var/www/html/
+  3.3. Conectar WordPress a la misma base de datos
+   	ir a:
+   		cd /var/www/html
+			sudo cp wp-config-sample.php wp-config.php
+			sudo nano wp-config.php
+		Busca y edita estas líneas:
+			define( 'DB_NAME', 'wp_db' );
+			define( 'DB_USER', 'wp_user' );
+			define( 'DB_PASSWORD', 'TuPasswordFuerte123!' );
+			define( 'DB_HOST', 'IP_PRIVADA_INSTANCIA_db-mysql:3306' );
+			Reemplaza IP_PRIVADA_DB por la Private IP de tu instancia MySQL
+			(ejemplo: ip-172-31-10-25.ec2.internal o 172.31.10.25).
+		Reinicia Apache:
+   		sudo systemctl restart apache2
+  ------ Repetir todos los step 3 para ambas instancias wp1 y wp2
+
+Step 4. Hacer la instalación inicial de WordPress (una sola vez: wp1)
+	Abre en tu navegador la IP pública de la instancia wp1 (ej. http://IP_PUBLICA_WP1).
+	Te aparecerá la pantalla de instalación de WordPress.
+		Elige idioma.
+		Configura:
+			Título del sitio.
+			Usuario administrador.
+			Contraseña.
+			Correo.
+	Estos datos se guardarán en la BD compartida (wp_db), así que la otra instancia los verá automáticamente.
+	Importante: haz la instalación solo una vez (en wp1).
+	Si abres la IP de wp2, ya debería mostrar el mismo sitio, porque usa la misma base de datos.
+
+Step 5. Crear un Load Balancer (ALB) para las dos instancias WordPress
+	
+	5.1.Crear un Target Group
+		Ve a EC2 → Target Groups → Create target group.
+		Target type: Instances.
+		Nombre: tg-wordpress.
+		Protocol: HTTP, Port: 80.
+		VPC: misma VPC donde están tus instancias.
+		Health check:
+			Protocol: HTTP
+			Path: / (por defecto está bien para WordPress)
+		Haz clic en Next y registra tus instancias:
+			Selecciona wp1 y wp2.
+			Puerto: 80.
+			Create target group.
+	5.2. Crear el Application Load Balancer (ALB)
+		Ve a EC2 → Load Balancers → Create load balancer.
+		Elige Application Load Balancer.
+			Nombre: alb-wordpress.
+			Scheme: Internet-facing.
+			IP address type: ipv4.
+			Network mapping:
+				Selecciona la misma VPC que tus instancias.
+				Selecciona al menos 2 subnets públicas (por ejemplo, us-east-3a y us-east-5b).
+			Security groups:
+				Selecciona el grupo creado: , por ejemplo sg-loadbalancer.
+		Listeners and routing:
+		Listener: HTTP:80
+		Default action: Forward to tg-wordpress.
+		Clic en Create load balancer.
+
+	Espera a que el ALB esté en estado active.
+	Probar el Load Balancer
+	En la lista de Load Balancers:
+		Copia el DNS name del ALB, algo tipo: alb-wordpress-1234567890.us-east-1.elb.amazonaws.com
+
+
+
